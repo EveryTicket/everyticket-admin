@@ -1,0 +1,77 @@
+.carousel-page {
+	display: grid;
+	gap: 24px;
+}
+.carousel-upload,
+.carousel-library {
+	padding: 24px;
+}
+.carousel-upload form {
+	max-width: 640px;
+}
+.carousel-upload fieldset {
+	border: 0;
+	padding: 0;
+	margin: 0;
+	min-width: 0;
+}
+.carousel-upload .form-field {
+	margin-block: 20px;
+}
+.carousel-upload textarea {
+	width: 100%;
+	min-height: 88px;
+	padding: 12px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	font: inherit;
+}
+.carousel-upload p,
+.carousel-library p {
+	color: var(--muted-foreground);
+}
+.carousel-preview {
+	width: 100%;
+	max-height: 280px;
+	aspect-ratio: 16 / 9;
+	object-fit: contain;
+	background: #f5f5f5;
+	border-radius: 8px;
+}
+.carousel-library-list {
+	list-style: none;
+	padding: 0;
+	display: grid;
+	gap: 16px;
+}
+.carousel-library-list li {
+	display: flex;
+	gap: 16px;
+	align-items: center;
+	border-top: 1px solid var(--border);
+	padding-top: 16px;
+}
+.carousel-library-list img {
+	width: 144px;
+	aspect-ratio: 16 / 9;
+	object-fit: contain;
+	background: #f5f5f5;
+	border-radius: 8px;
+}
+.carousel-library-list li > div {
+	flex: 1;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+	.carousel-upload,
+	.carousel-library {
+		padding: 16px;
+	}
+	.carousel-library-list li {
+		flex-wrap: wrap;
+	}
+	.carousel-library-list img {
+		width: 96px;
+	}
+}

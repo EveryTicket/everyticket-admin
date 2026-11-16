@@ -5,6 +5,7 @@ import RecordPage from "@/features/live/record-page";
 import LiveRecords from "@/features/live/records";
 import DashboardLayout from "@/layouts/dashboardLayout";
 
+const CarouselPage = lazy(() => import("@/features/carousel/carousel-page"));
 const Overview = lazy(() => import("@/features/live/overview"));
 const Login = lazy(() => import("@/pages/login"));
 
@@ -30,7 +31,8 @@ export function AppRoutes() {
 						element={<RecordPage key={resource} resource={resource} />}
 					/>
 				))}
-				{["jobs", "reconciliation"].map((path) => (
+				<Route path="jobs" element={<CarouselPage />} />
+				{["reconciliation"].map((path) => (
 					<Route
 						key={path}
 						path={path}
