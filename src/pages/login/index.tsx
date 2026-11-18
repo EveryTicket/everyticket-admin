@@ -5,7 +5,10 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Brand } from "@/features/admin/components";
+import type { Profile } from "@/features/live/contracts";
+import { api } from "@/lib/api";
 import { authClient } from "@/lib/auth";
+import { queryClient } from "@/lib/query-client";
 
 export default function Login() {
 	const [pending, setPending] = useState(false);
@@ -56,6 +59,18 @@ export default function Login() {
 										"Unable to sign in. Check your credentials.",
 								);
 							else {
+								const profile = (await api.get<Profile>("/account/me")).data;
+								if (
+									profile.role !== "ADMIN" &&
+									!profile.roles.includes("ADMIN")
+								) {
+									await authClient.signOut();
+									queryClient.clear();
+									reportError(
+										"This account does not have administrator permissions. Use an administrator account.",
+									);
+									return;
+								}
 								toast.success("Signed in successfully.");
 								navigate("/overview", { replace: true });
 							}
