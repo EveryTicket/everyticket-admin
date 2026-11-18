@@ -5,10 +5,8 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Brand } from "@/features/admin/components";
-import type { Profile } from "@/features/live/contracts";
+import { errorMessage } from "@/features/live/api";
 import { api } from "@/lib/api";
-import { authClient } from "@/lib/auth";
-import { queryClient } from "@/lib/query-client";
 
 export default function Login() {
 	const [pending, setPending] = useState(false);
@@ -49,35 +47,14 @@ export default function Login() {
 						setPending(true);
 						setError("");
 						try {
-							const response = await authClient.signIn.email({
+							await api.post("/admin/sign-in", {
 								email: fields.email,
 								password: fields.password,
 							});
-							if (response.error)
-								reportError(
-									response.error.message ||
-										"Unable to sign in. Check your credentials.",
-								);
-							else {
-								const profile = (await api.get<Profile>("/account/me")).data;
-								if (
-									profile.role !== "ADMIN" &&
-									!profile.roles.includes("ADMIN")
-								) {
-									await authClient.signOut();
-									queryClient.clear();
-									reportError(
-										"This account does not have administrator permissions. Use an administrator account.",
-									);
-									return;
-								}
-								toast.success("Signed in successfully.");
-								navigate("/overview", { replace: true });
-							}
-						} catch {
-							reportError(
-								"Unable to reach the authentication service. Please try again.",
-							);
+							toast.success("Signed in successfully.");
+							navigate("/overview", { replace: true });
+						} catch (error) {
+							reportError(errorMessage(error));
 						} finally {
 							setPending(false);
 						}
