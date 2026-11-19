@@ -53,6 +53,7 @@ export function Modal({
 	description,
 	children,
 	side = false,
+	pending = false,
 }: {
 	open: boolean;
 	onClose: () => void;
@@ -60,17 +61,29 @@ export function Modal({
 	description?: string;
 	children: ReactNode;
 	side?: boolean;
+	pending?: boolean;
 }) {
 	const ref = useRef<HTMLDialogElement>(null);
+	const opener = useRef<HTMLElement | null>(null);
 	const titleId = useId();
 	const descriptionId = useId();
 	useEffect(() => {
 		const dialog = ref.current;
 		if (open && !dialog?.open) {
+			opener.current = document.activeElement as HTMLElement;
 			dialog?.showModal();
 			dialog?.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
 		}
-		if (!open && dialog?.open) dialog.close();
+		if (!open && dialog?.open) {
+			dialog.close();
+			if (opener.current?.isConnected) opener.current.focus();
+		}
+		return () => {
+			if (dialog?.open) {
+				dialog.close();
+				if (opener.current?.isConnected) opener.current.focus();
+			}
+		};
 	}, [open]);
 	useEffect(() => {
 		if (!open) return;
@@ -90,8 +103,10 @@ export function Modal({
 			className={`modal ${side ? "side-modal" : ""}`}
 			aria-labelledby={titleId}
 			aria-describedby={description ? descriptionId : undefined}
-			onCancel={onClose}
-			onClose={onClose}
+			onCancel={(event) => {
+				event.preventDefault();
+				if (!pending) onClose();
+			}}
 		>
 			<div className="modal-head">
 				<div>
@@ -102,7 +117,10 @@ export function Modal({
 				<button
 					type="button"
 					className="icon-button"
-					onClick={onClose}
+					disabled={pending}
+					onClick={() => {
+						if (!pending) onClose();
+					}}
 					aria-label="Close dialog"
 				>
 					<X size={20} />

@@ -22,7 +22,7 @@
 	width: 100%;
 	min-height: 88px;
 	padding: 12px;
-	border: 1px solid var(--border);
+	border: 1px solid #87788f;
 	border-radius: 8px;
 	font: inherit;
 }
@@ -74,4 +74,10 @@
 	.carousel-library-list img {
 		width: 96px;
 	}
+}
+
+/* Only JPEG guarantees opacity. PNG/WebP with unknown alpha remain unframed. */
+.opaque-image {
+	outline: 1px solid oklch(0 0 0 / 0.1);
+	outline-offset: -1px;
 }

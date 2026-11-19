@@ -168,3 +168,33 @@ export function actionBody(action: Action, values: Record<string, string>) {
 	}
 	return body;
 }
+
+export function actionConsequence(action: Action): string {
+	const consequences: Record<string, string> = {
+		"Suspend event": "Suspend publication of this event. A reason is required.",
+		"Restore event": "Restore publication of this event.",
+		"Feature event": "Feature this event on Everyticket.",
+		"Remove feature": "Remove this event from featured placement.",
+		"Block profile": "Block access for this profile. A reason is required.",
+		"Unblock profile": "Restore access for this profile.",
+		"Approve refund":
+			"Approve the entered refund amounts for processing. Execution is a separate action.",
+		"Reject refund": "Reject this refund request with the reason below.",
+		"Execute refund":
+			"Submit this approved refund for gateway processing. Completion requires gateway confirmation.",
+		"Reconcile refund":
+			"Check gateway processing and reconcile this refund's status.",
+		"Record gateway completion":
+			"Record the gateway's completion reference and status for this refund.",
+		"Approve payout": "Approve this organizer payout for an external transfer.",
+		"Reject payout": "Reject this payout request with the reason below.",
+		"Record transfer":
+			"Record an external transfer already made to the organizer. This does not initiate a transfer.",
+		"Replace active fee rule":
+			"Replace the global active fee rule for future orders from the effective time. Existing orders keep their original fee.",
+	};
+	return (
+		consequences[action.label] ||
+		"Apply this fee rule globally to future orders from the effective time."
+	);
+}

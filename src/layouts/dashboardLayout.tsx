@@ -1,6 +1,7 @@
 import { Spinner } from "@/components/ui/spinner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+	Menu,
 	CreditCard,
 	FileClock,
 	Gauge,
@@ -21,7 +22,7 @@ import {
 } from "react-router-dom";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Brand } from "@/features/admin/components";
+import { Brand, Modal } from "@/features/admin/components";
 import { initials } from "@/features/admin/format";
 import type { Profile } from "@/features/live/contracts";
 import { useAuth } from "@/hooks/useAuth";
@@ -58,6 +59,7 @@ const groups = [
 
 import { errorMessage } from "@/features/live/api";
 export default function DashboardLayout() {
+	const [menuOpen, setMenuOpen] = useState(false);
 	const location = useLocation();
 	const navigate = useNavigate();
 	const [signingOut, setSigningOut] = useState(false);
@@ -130,6 +132,26 @@ export default function DashboardLayout() {
 				</button>
 			</div>
 		);
+	const navigation = (
+		<nav className="side-navigation" aria-label="Main navigation">
+			{groups.map((group) => (
+				<div className="nav-group" key={group.label}>
+					<p>{group.label}</p>
+					{group.items.map((item) => (
+						<NavLink
+							key={item.path}
+							className="nav-item"
+							to={item.path}
+							onClick={() => setMenuOpen(false)}
+						>
+							<item.icon size={18} strokeWidth={1.7} />
+							<span>{item.title}</span>
+						</NavLink>
+					))}
+				</div>
+			))}
+		</nav>
+	);
 	return (
 		<div className="app-shell">
 			<a href="#main-content" className="skip-link">
@@ -138,19 +160,7 @@ export default function DashboardLayout() {
 			<aside className="desktop-sidebar">
 				<Brand />
 				<div className="workspace-label">Platform administration</div>
-				<nav className="side-navigation">
-					{groups.map((group) => (
-						<div className="nav-group" key={group.label}>
-							<p>{group.label}</p>
-							{group.items.map((item) => (
-								<NavLink key={item.path} className="nav-item" to={item.path}>
-									<item.icon size={18} strokeWidth={1.7} />
-									<span>{item.title}</span>
-								</NavLink>
-							))}
-						</div>
-					))}
-				</nav>
+				{navigation}
 				<div className="sidebar-bottom" />
 				<div className="sidebar-user">
 					<span className="sidebar-avatar">
@@ -162,8 +172,33 @@ export default function DashboardLayout() {
 					</span>
 				</div>
 			</aside>
+			<Modal
+				open={menuOpen}
+				title="Navigation"
+				onClose={() => setMenuOpen(false)}
+				side
+			>
+				<div className="mobile-navigation">{navigation}</div>
+				<button
+					type="button"
+					className="text-link"
+					disabled={signingOut}
+					onClick={signOut}
+				>
+					{signingOut ? "Signing out…" : "Sign out"}
+				</button>
+			</Modal>
 			<div className="workspace-content">
 				<header className="topbar">
+					<button
+						type="button"
+						className="button navigation-toggle"
+						aria-haspopup="dialog"
+						aria-expanded={menuOpen}
+						onClick={() => setMenuOpen(true)}
+					>
+						<Menu size={18} /> Menu
+					</button>
 					<div className="breadcrumb">
 						<span>Workspace</span>
 						<span className="breadcrumb-slash">/</span>

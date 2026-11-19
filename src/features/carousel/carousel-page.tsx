@@ -33,6 +33,7 @@ export default function CarouselPage() {
 	const [removing, setRemoving] = useState<CarouselImage | null>(null);
 	const [completionId, setCompletionId] = useState<string | null>(null);
 	const submitting = useRef(false);
+	const removalInFlight = useRef(false);
 	const fileInput = useRef<HTMLInputElement>(null);
 	useEffect(
 		() => () => {
@@ -109,6 +110,7 @@ export default function CarouselPage() {
 		onSuccess: () => setRemoving(null),
 		onSettled: async () => {
 			await client.invalidateQueries({ queryKey: key });
+			removalInFlight.current = false;
 		},
 	});
 	function choose(file?: File) {
@@ -163,7 +165,7 @@ export default function CarouselPage() {
 						</div>
 						{selection && (
 							<img
-								className="carousel-preview"
+								className={`carousel-preview ${selection.file.type === "image/jpeg" ? "opaque-image" : ""}`}
 								src={selection.url}
 								alt="Selected preview"
 								onError={() => {
@@ -263,7 +265,15 @@ export default function CarouselPage() {
 				<ol className="carousel-library-list">
 					{images.data?.map((image, index) => (
 						<li key={image.id}>
-							<img src={image.publicUrl} alt={image.altText} />
+							<img
+								className={
+									image.contentType === "image/jpeg"
+										? "opaque-image"
+										: undefined
+								}
+								src={image.publicUrl}
+								alt={image.altText}
+							/>
 							<div>
 								<strong>
 									{index + 1}. {image.altText}
@@ -289,6 +299,7 @@ export default function CarouselPage() {
 			</section>
 			<Modal
 				open={Boolean(removing)}
+				pending={remove.isPending}
 				onClose={() => {
 					if (!remove.isPending) setRemoving(null);
 				}}
@@ -316,7 +327,10 @@ export default function CarouselPage() {
 						type="button"
 						disabled={remove.isPending}
 						onClick={() => {
-							if (removing && !remove.isPending) remove.mutate(removing.id);
+							if (removing && !removalInFlight.current) {
+								removalInFlight.current = true;
+								remove.mutate(removing.id);
+							}
 						}}
 					>
 						{remove.isPending ? "Removing…" : "Confirm removal"}

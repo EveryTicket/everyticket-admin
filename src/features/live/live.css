@@ -1,5 +1,5 @@
 .records-panel {
-	overflow-x: auto;
+	min-width: 0;
 }
 .records-panel table {
 	width: 100%;
@@ -8,7 +8,7 @@
 	font-size: 12px;
 }
 .records-panel th {
-	color: #84798b;
+	color: #685e70;
 	font-size: 10px;
 	text-transform: uppercase;
 	letter-spacing: 0.8px;
@@ -20,13 +20,13 @@
 	border-bottom: 1px solid #eee9f0;
 }
 .records-panel td p {
-	color: #84798b;
+	color: #685e70;
 	margin-top: 5px;
 }
 .records-panel input,
 .records-panel select {
 	padding: 10px 12px;
-	border: 1px solid #e5dfe9;
+	border: 1px solid #87788f;
 	border-radius: 7px;
 	background: white;
 }
@@ -45,43 +45,11 @@
 }
 .record-detail dt {
 	margin-bottom: 8px;
-	color: #84798b;
+	color: #685e70;
 	text-transform: capitalize;
 }
 .record-detail dd {
 	overflow-wrap: anywhere;
-}
-@media (max-width: 1100px) {
-	.app-shell > .desktop-sidebar {
-		display: flex;
-		position: static;
-		height: auto;
-	}
-	.app-shell {
-		grid-template-columns: 190px minmax(0, 1fr);
-	}
-}
-@media (max-width: 650px) {
-	.app-shell {
-		display: block;
-	}
-	.app-shell > .desktop-sidebar {
-		padding: 15px;
-	}
-	.app-shell .side-navigation {
-		display: flex;
-		flex-direction: row;
-		overflow-x: auto;
-		gap: 12px;
-	}
-	.app-shell .nav-group {
-		min-width: 130px;
-	}
-	.app-shell .sidebar-user,
-	.app-shell .sidebar-bottom,
-	.app-shell .workspace-label {
-		display: none;
-	}
 }
 
 .records-state {
@@ -91,7 +59,7 @@
 	gap: 10px;
 	min-height: 160px;
 	padding: 32px 22px;
-	color: #84798b;
+	color: #685e70;
 	font-size: 13px;
 	text-align: center;
 }
@@ -117,7 +85,7 @@
 }
 .record-id {
 	margin: 10px 0;
-	color: #84798b;
+	color: #685e70;
 }
 .detail-actions {
 	display: flex;
@@ -169,4 +137,99 @@
 		grid-template-columns: minmax(0, 1fr);
 		gap: 20px;
 	}
+}
+
+.navigation-toggle,
+.mobile-field-label {
+	display: none;
+}
+.mobile-navigation .nav-group > p {
+	color: #685e70;
+}
+.mobile-navigation .nav-item {
+	color: var(--ink);
+}
+.mobile-navigation .nav-item.active {
+	background: var(--brand-soft);
+	color: var(--primary);
+}
+.collection-table td {
+	overflow-wrap: anywhere;
+}
+.table-toolbar {
+	flex-wrap: wrap;
+}
+.table-toolbar input,
+.table-toolbar select {
+	min-width: 0;
+	max-width: 100%;
+}
+@media (max-width: 1099px) {
+	.navigation-toggle {
+		display: inline-flex;
+	}
+}
+@media (max-width: 650px) {
+	.topbar {
+		gap: 8px;
+	}
+	.topbar .breadcrumb {
+		white-space: normal;
+		min-width: 0;
+		gap: 4px;
+	}
+	.topbar .text-link,
+	.navigation-toggle {
+		flex-shrink: 0;
+		min-height: 44px;
+	}
+	.collection-table,
+	.collection-table tbody,
+	.collection-table tr,
+	.collection-table td {
+		display: block;
+		width: 100%;
+		min-width: 0;
+	}
+	.collection-table thead {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		clip-path: inset(50%);
+		overflow: hidden;
+	}
+	.collection-table tr {
+		padding: 16px;
+		border-bottom: 1px solid var(--border);
+	}
+	.records-panel .collection-table td {
+		padding: 6px 0;
+		border: 0;
+		white-space: normal;
+	}
+	.mobile-field-label {
+		display: block;
+		font-size: 11px;
+		color: #685e70;
+		margin-bottom: 4px;
+	}
+	.detail-actions {
+		margin-top: 16px;
+	}
+}
+.detail-scroll-hint {
+	margin: 0 0 8px;
+	color: #685e70;
+	font-size: 12px;
+}
+.detail-table {
+	overscroll-behavior: contain;
+}
+
+.event-media-preview {
+	display: block;
+	max-width: 100%;
+	max-height: 240px;
+	object-fit: contain;
+	border-radius: 8px;
 }

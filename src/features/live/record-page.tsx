@@ -12,6 +12,10 @@ import {
 	resources,
 } from "./contracts";
 import { RecordDetail } from "./record-detail";
+import { presentRecord } from "./record-presentation";
+import { api } from "@/lib/api";
+import { date, money } from "@/features/admin/format";
+import { actionConsequence } from "./actions";
 import { statusLabel } from "./status";
 
 export default function RecordPage({ resource }: { resource: Resource }) {
@@ -20,6 +24,7 @@ export default function RecordPage({ resource }: { resource: Resource }) {
 	return <Details key={id} resource={resource} id={id} />;
 }
 function Details({ resource, id }: { resource: Resource; id: string }) {
+	const [pending, setPending] = useState(false);
 	const [search] = useSearchParams();
 	const from = search.get("from");
 	const origin = from === null ? undefined : new URLSearchParams(from);
@@ -44,6 +49,15 @@ function Details({ resource, id }: { resource: Resource; id: string }) {
 				.find((row) => row.id === id),
 		staleTime: 0,
 		refetchOnMount: "always",
+		retry: false,
+	});
+	const activeRule = useQuery<RecordItem | null>({
+		queryKey: ["admin", "fee-rules", "active"],
+		enabled: resource === "fee-rules" && Boolean(action),
+		queryFn: async ({ signal }) =>
+			(await api.get<RecordItem | null>("/admin/platform-fee-rule", { signal }))
+				.data,
+		staleTime: 0,
 		retry: false,
 	});
 	const row = query.data;
@@ -116,11 +130,59 @@ function Details({ resource, id }: { resource: Resource; id: string }) {
 				</div>
 			)}
 			{row && <RecordDetail record={row} resource={resource} />}
-			{action && ready && action.updatedAt === query.dataUpdatedAt && (
-				<Modal open title={action.item.label} onClose={() => setAction(null)}>
+			{action && (
+				<Modal
+					open
+					pending={pending}
+					title={action.item.label}
+					onClose={() => {
+						if (!pending) setAction(null);
+					}}
+				>
+					{row && (
+						<div className="action-context">
+							<strong>{presentRecord(resource, row).title}</strong>
+							<p>{row.id}</p>
+							<p>{row.event?.title || row.user?.email || row.buyerEmail}</p>
+							{row.organizer && <p>Organizer: {row.organizer.user.name}</p>}
+							<p>{row.order?.reference || row.reference}</p>
+							{Object.entries(row)
+								.filter(
+									([key, value]) =>
+										key.endsWith("Kobo") && typeof value === "number",
+								)
+								.map(([key, value]) => (
+									<p key={key}>
+										{key
+											.replace(/Kobo$/, "")
+											.replace(/([a-z])([A-Z])/g, "$1 $2")}
+										: {money(value as number)}
+									</p>
+								))}
+							{resource === "fee-rules" && (
+								<p>
+									Selected version {row.version}:{" "}
+									{row.mode === "FIXED"
+										? money(row.fixedAmountKobo || 0)
+										: `${(row.percentageBasisPoints || 0) / 100}%`}
+									. This operation replaces the global active rule.
+									{activeRule.isPending
+										? " Loading active rule…"
+										: activeRule.isError
+											? " Active rule context could not be loaded. Close and reopen to retry."
+											: activeRule.data
+												? ` Active rule: version ${activeRule.data.version} (${activeRule.data.id}), ${activeRule.data.mode === "FIXED" ? money(activeRule.data.fixedAmountKobo || 0) : `${(activeRule.data.percentageBasisPoints || 0) / 100}%`}${activeRule.data.activeFrom ? `, effective ${date(activeRule.data.activeFrom, true)} WAT` : ""}.`
+												: " There is no active fee rule."}
+								</p>
+							)}
+						</div>
+					)}
+					<p className="action-intro">{actionConsequence(action.item)}</p>
 					<ActionForm
 						key={action.item.path}
 						action={action.item}
+						onPendingChange={setPending}
+						available={ready && action.updatedAt === query.dataUpdatedAt}
 						close={() => setAction(null)}
 					/>
 				</Modal>

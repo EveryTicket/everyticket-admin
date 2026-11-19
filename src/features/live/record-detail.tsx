@@ -1,3 +1,4 @@
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { date, money } from "@/features/admin/format";
 import type { RecordItem, Resource } from "./contracts";
 
@@ -91,14 +92,85 @@ const sections: Record<Resource, Record<string, string[]>> = {
 };
 const label = (key: string) =>
 	key.replace(/Kobo$/, " (NGN)").replace(/([a-z])([A-Z])/g, "$1 $2");
-function Value({ field, value }: { field: string; value: unknown }) {
+function MediaLink({
+	url,
+	title,
+	image,
+}: {
+	url: string;
+	title: string;
+	image: boolean;
+}) {
+	const [failed, setFailed] = useState(false);
+	return (
+		<div>
+			{image && !failed && (
+				<img
+					className="event-media-preview"
+					src={url}
+					alt={title}
+					onError={() => setFailed(true)}
+				/>
+			)}
+			<a
+				className="text-link"
+				href={url}
+				target="_blank"
+				rel="noopener noreferrer"
+			>
+				Open {title}
+			</a>
+		</div>
+	);
+}
+function DetailScroll({ children }: { children: ReactNode }) {
+	const ref = useRef<HTMLElement>(null);
+	const [overflow, setOverflow] = useState(false);
+	useEffect(() => {
+		const element = ref.current;
+		if (!element) return;
+		const observer = new ResizeObserver(() =>
+			setOverflow(element.scrollWidth > element.clientWidth),
+		);
+		observer.observe(element);
+		if (element.firstElementChild) observer.observe(element.firstElementChild);
+		return () => observer.disconnect();
+	}, []);
+	return (
+		<div>
+			{overflow && (
+				<p className="detail-scroll-hint">
+					More columns → Scroll horizontally; keyboard users can focus the table
+					and use arrow keys.
+				</p>
+			)}
+			<section
+				ref={ref}
+				className="detail-table"
+				aria-label="Payment attempts"
+				tabIndex={overflow ? 0 : undefined}
+			>
+				{children}
+			</section>
+		</div>
+	);
+}
+function Value({
+	field,
+	value,
+	media = false,
+}: {
+	field: string;
+	value: unknown;
+	media?: boolean;
+}) {
 	if (value == null) return <span>—</span>;
 	if (Array.isArray(value)) {
 		if (!value.length) return <span>None</span>;
 		if (field === "paymentAttempts") {
 			const columns = [...new Set(value.flatMap((item) => Object.keys(item)))];
 			return (
-				<div className="detail-table">
+				<DetailScroll>
 					<table>
 						<thead>
 							<tr>
@@ -119,7 +191,7 @@ function Value({ field, value }: { field: string; value: unknown }) {
 							))}
 						</tbody>
 					</table>
-				</div>
+				</DetailScroll>
 			);
 		}
 		return (
@@ -127,14 +199,23 @@ function Value({ field, value }: { field: string; value: unknown }) {
 				{value.map((item, index) => (
 					// biome-ignore lint/suspicious/noArrayIndexKey: Read-only API arrays may contain duplicate primitives without IDs.
 					<li key={index}>
-						<Value field={field} value={item} />
+						<Value
+							field={field}
+							value={item}
+							media={media || field === "media"}
+						/>
 					</li>
 				))}
 			</ol>
 		);
 	}
 	if (typeof value === "object")
-		return <Fields values={value as Record<string, unknown>} />;
+		return (
+			<Fields
+				values={value as Record<string, unknown>}
+				media={media || field === "media"}
+			/>
+		);
 	if (typeof value === "number" && field.endsWith("Kobo"))
 		return <>{money(value)}</>;
 	if (typeof value === "number" && field.endsWith("BasisPoints"))
@@ -151,7 +232,31 @@ function Value({ field, value }: { field: string; value: unknown }) {
 		return <>{date(value, true)} WAT</>;
 	return <>{String(value)}</>;
 }
-function Fields({ values }: { values: Record<string, unknown> }) {
+function mediaUrl(
+	field: string,
+	value: unknown,
+	media: boolean,
+): string | null {
+	if (
+		!media ||
+		typeof value !== "string" ||
+		!["url", "publicUrl", "secureUrl", "thumbnailUrl"].includes(field)
+	)
+		return null;
+	try {
+		const url = new URL(value);
+		return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+	} catch {
+		return null;
+	}
+}
+function Fields({
+	values,
+	media = false,
+}: {
+	values: Record<string, unknown>;
+	media?: boolean;
+}) {
 	return (
 		<dl className="record-detail">
 			{Object.entries(values).map(([key, value]) => (
@@ -161,7 +266,25 @@ function Fields({ values }: { values: Record<string, unknown> }) {
 				>
 					<dt>{label(key)}</dt>
 					<dd>
-						<Value field={key} value={value} />
+						{mediaUrl(key, value, media) ? (
+							<MediaLink
+								url={mediaUrl(key, value, media) as string}
+								title={
+									typeof values.altText === "string"
+										? values.altText
+										: `${label(key)} media`
+								}
+								image={[
+									"image/jpeg",
+									"image/png",
+									"image/webp",
+									"image/gif",
+									"image/avif",
+								].includes(String(values.contentType || values.mimeType))}
+							/>
+						) : (
+							<Value field={key} value={value} media={media} />
+						)}
 					</dd>
 				</div>
 			))}
@@ -194,7 +317,9 @@ export function RecordDetail({
 						<Value field="paymentAttempts" value={record.paymentAttempts} />
 					) : (
 						<Fields
-							values={Object.fromEntries(fields.map((key) => [key, record[key]]))}
+							values={Object.fromEntries(
+								fields.map((key) => [key, record[key]]),
+							)}
 						/>
 					)}
 				</section>

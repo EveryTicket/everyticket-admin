@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { expect, test, type Page } from "@playwright/test";
 
 const records: Record<string, Record<string, unknown>> = {
@@ -316,10 +317,16 @@ test("confirmation cancellation, failure and refreshed action availability", asy
 		.getByRole("button", { name: "Reject refund", exact: true })
 		.click();
 	await page.getByRole("textbox").fill("Duplicate request");
-	await page.getByRole("button", { name: "Confirm", exact: true }).click();
+	await page
+		.getByRole("dialog")
+		.getByRole("button", { name: "Reject refund", exact: true })
+		.click();
 	await expect(page.getByRole("alert")).toHaveText("Review failed");
 	fail = false;
-	await page.getByRole("button", { name: "Confirm", exact: true }).click();
+	await page
+		.getByRole("dialog")
+		.getByRole("button", { name: "Reject refund", exact: true })
+		.click();
 	await expect(page.getByRole("dialog")).toHaveCount(0);
 	await expect(
 		page.getByRole("button", { name: "Reject refund", exact: true }),
@@ -434,13 +441,17 @@ for (const mode of ["FIXED", "PERCENTAGE"]) {
 		const dialog = page.getByRole("dialog");
 		await dialog.getByRole("combobox").selectOption(mode);
 		await dialog
-			.getByLabel("Fixed amount (kobo) or percentage (basis points)")
+			.getByLabel(
+				mode === "PERCENTAGE"
+					? "Percentage (basis points)"
+					: "Fixed amount (kobo)",
+			)
 			.fill("250");
 		await dialog
 			.getByLabel("Effective at (Africa/Lagos)")
 			.fill("2099-11-11T10:30");
 		await dialog.getByLabel("Reason", { exact: true }).fill("New fee schedule");
-		await dialog.getByRole("button", { name: "Confirm", exact: true }).click();
+		await dialog.locator('button[type="submit"]').click();
 		await expect(
 			dialog.getByRole("button", { name: "Saving…" }),
 		).toBeDisabled();
@@ -490,14 +501,12 @@ test("fee rules: failed add preserves values and permits retry", async ({
 	await page.goto("/fee-rules");
 	await page.getByRole("button", { name: "Add fee rule", exact: true }).click();
 	const dialog = page.getByRole("dialog");
-	await dialog
-		.getByLabel("Fixed amount (kobo) or percentage (basis points)")
-		.fill("500");
+	await dialog.getByLabel("Fixed amount (kobo)").fill("500");
 	await dialog
 		.getByLabel("Effective at (Africa/Lagos)")
 		.fill("2099-11-11T10:30");
 	await dialog.getByLabel("Reason", { exact: true }).fill("New fee schedule");
-	await dialog.getByRole("button", { name: "Confirm", exact: true }).click();
+	await dialog.locator('button[type="submit"]').click();
 	await expect(dialog.getByRole("alert")).toHaveText(
 		"A rule already starts at this time.",
 	);
@@ -516,7 +525,7 @@ test("fee rules: failed add preserves values and permits retry", async ({
 	await dialog
 		.getByLabel("Effective at (Africa/Lagos)")
 		.fill("2099-11-12T10:30");
-	await dialog.getByRole("button", { name: "Confirm", exact: true }).click();
+	await dialog.locator('button[type="submit"]').click();
 	await expect(dialog).not.toBeVisible();
 	await expect(
 		page.locator('[data-sonner-toast][data-type="success"]'),
@@ -555,7 +564,7 @@ for (const [resource, status, label, message] of actionScenarios) {
 		// Fee replacement targets the collection endpoint.
 		if (resource === "fee-rules")
 			await page.route("**/api/v1/admin/platform-fee-rule", (route) => {
-				submissions++;
+				if (route.request().method() !== "GET") submissions++;
 				return route.fulfill({ json: record });
 			});
 		await page.goto(`/${resource}/${records[resource].id}`);
@@ -571,7 +580,7 @@ for (const [resource, status, label, message] of actionScenarios) {
 						: "Reviewed reference",
 			);
 		}
-		await dialog.getByRole("button", { name: "Confirm", exact: true }).click();
+		await dialog.locator('button[type="submit"]').click();
 		await expect(dialog).not.toBeVisible();
 		const toasts = page.locator('[data-sonner-toast][data-type="success"]');
 		await expect(toasts).toHaveCount(1);
@@ -591,8 +600,8 @@ test("cancel and invalid action submissions produce no toasts or requests", asyn
 	await page.goto("/users/profile_exact");
 	await page.getByRole("button", { name: "Block profile" }).click();
 	const dialog = page.getByRole("dialog");
-	await dialog.getByRole("button", { name: "Confirm", exact: true }).click();
-	await expect(dialog.getByRole("alert")).toHaveText("Enter a valid value.");
+	await dialog.locator('button[type="submit"]').click();
+	await expect(dialog.getByRole("alert")).toHaveText("Enter reason.");
 	await dialog.getByRole("button", { name: "Cancel" }).click();
 	await expect(dialog).not.toBeVisible();
 	await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
@@ -613,6 +622,10 @@ for (const width of [1440, 390]) {
 			"outline-color",
 			"rgb(143, 34, 242)",
 		);
+		await page.screenshot({
+			path: `.scratch/ui-polish/evidence/login-${width}.png`,
+			fullPage: true,
+		});
 		await mock(page);
 		await page.route("**/api/v1/admin/summary", (route) =>
 			route.fulfill({
@@ -751,4 +764,418 @@ test("CSV exports only the current page with raw kobo and escaped cells", async 
 	expect(Buffer.concat(chunks).toString("utf8")).toBe(
 		'\uFEFF"ID","Record","Status","Amount (kobo)"\r\n"page-two","\'=SUM(""x"")","PAID","0"',
 	);
+});
+
+test("polish: pending dialog survives dismissal and repeat submission", async ({
+	page,
+}) => {
+	await mock(page);
+	let release = () => {};
+	const gate = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	let submissions = 0;
+	await page.route("**/admin/events/*/featured", async (route) => {
+		submissions++;
+		expect(route.request().postDataJSON()).toEqual({ featured: true });
+		await gate;
+		await route.fulfill({ json: { success: true } });
+	});
+	await page.goto("/events/event_id_exact");
+	const opener = page.getByRole("button", {
+		name: "Feature event",
+		exact: true,
+	});
+	await opener.click();
+	const dialog = page.getByRole("dialog");
+	await dialog
+		.getByRole("button", { name: /Confirm$|^Feature event$/ })
+		.click();
+	try {
+		await expect.poll(() => submissions).toBe(1);
+		await dialog
+			.getByRole("button", { name: "Close dialog" })
+			.dispatchEvent("click");
+		await expect(dialog).toBeVisible();
+		await dialog.getByRole("button", { name: "Cancel" }).dispatchEvent("click");
+		await page.keyboard.press("Escape");
+		await expect(dialog).toBeVisible();
+		await expect(
+			dialog.getByRole("button", { name: "Close dialog" }),
+		).toBeDisabled();
+		await dialog.locator("form").dispatchEvent("submit");
+		expect(submissions).toBe(1);
+	} finally {
+		release();
+	}
+	await expect(dialog).not.toBeVisible();
+	await expect(opener).toBeFocused();
+	expect(await page.evaluate("document.body.style.overflow")).toBe("");
+});
+
+test("polish: reduced motion uses opacity only", async ({ page }) => {
+	await mock(page);
+	await page.emulateMedia({ reducedMotion: "reduce" });
+	await page.goto("/events/event_id_exact");
+	await page.addStyleTag({
+		content: ".modal[open] { animation-play-state: paused; }",
+	});
+	await page
+		.getByRole("button", { name: "Feature event", exact: true })
+		.click();
+	const frames: Record<string, unknown>[] = await page
+		.getByRole("dialog")
+		.evaluate((element) =>
+			element.getAnimations().flatMap((animation) => {
+				animation.pause();
+				animation.playbackRate = 0.1;
+				return (animation.effect as KeyframeEffect).getKeyframes();
+			}),
+		);
+	expect(frames.length).toBeGreaterThan(0);
+	for (const frame of frames) {
+		expect(frame.translate).toBeUndefined();
+		expect(frame.transform).toBeUndefined();
+		expect(frame.filter).toBeUndefined();
+		expect(frame.scale).toBeUndefined();
+	}
+});
+
+for (const width of [320, 390, 768, 1440]) {
+	test(`polish: collections and navigation at ${width}px`, async ({ page }) => {
+		await mock(page);
+		await page.setViewportSize({ width, height: 900 });
+		for (const resource of Object.keys(records)) {
+			await page.goto(`/${resource}`);
+			const link = page.getByRole("link", { name: "View details" });
+			await expect(link).toBeVisible();
+			const box = await link.boundingBox();
+			expect(box && box.x >= 0 && box.x + box.width <= width).toBe(true);
+			expect(
+				await page.evaluate(
+					"document.documentElement.scrollWidth <= innerWidth",
+				),
+			).toBe(true);
+			if (width < 650) expect(box?.height).toBeGreaterThanOrEqual(44);
+		}
+		if (width < 1100) {
+			const opener = page.getByRole("button", { name: "Menu", exact: true });
+			await opener.focus();
+			await page.keyboard.press("Enter");
+			const menu = page.getByRole("dialog", { name: "Navigation" });
+			await expect(menu).toBeVisible();
+			await expect(menu.getByRole("link")).toHaveCount(10);
+			for (let tab = 0; tab < 15; tab++) {
+				await page.keyboard.press("Tab");
+				expect(
+					await menu.evaluate(
+						(element) =>
+							element.contains(document.activeElement) ||
+							document.activeElement === document.body,
+					),
+				).toBe(true);
+			}
+			if (width === 320)
+				await page.screenshot({
+					path: ".scratch/ui-polish/evidence/mobile-menu.png",
+				});
+
+			for (const link of await menu.getByRole("link").all()) {
+				await link.scrollIntoViewIfNeeded();
+				await expect(link).toBeInViewport();
+			}
+			await page.keyboard.press("Escape");
+			await expect(opener).toBeFocused();
+			await opener.click();
+			await menu.getByRole("link", { name: "Orders", exact: true }).click();
+			await expect(menu).not.toBeVisible();
+			await expect(page).toHaveURL("/orders");
+		}
+		console.log(`Polish ${width}px targets`, {
+			signOut: await page
+				.getByRole("button", { name: "Sign out", exact: true })
+				.boundingBox(),
+			action: await page
+				.getByRole("link", { name: "View details" })
+				.boundingBox(),
+		});
+		await page.screenshot({
+			path: `.scratch/ui-polish/evidence/collection-${width}.png`,
+			fullPage: true,
+		});
+	});
+}
+
+test("polish: field errors, fee interpretation and contextual media", async ({
+	page,
+}) => {
+	await mock(page);
+	await page.goto("/fee-rules");
+	await page.getByRole("button", { name: "Add fee rule" }).click();
+	const dialog = page.getByRole("dialog");
+	await dialog.locator('button[type="submit"]').click();
+	const amount = dialog.getByLabel("Fixed amount (kobo)");
+	await expect(amount).toHaveAttribute("aria-invalid", "true");
+	const errorId = (await amount.getAttribute("aria-describedby"))
+		?.split(" ")
+		.pop();
+	await expect(page.locator(`[id="${errorId}"]`)).toHaveText(
+		"Enter fixed amount (kobo).",
+	);
+	await amount.fill("250");
+	await expect(dialog.getByText(/Preview: ₦2.50/)).toBeVisible();
+	await dialog.getByLabel("Mode", { exact: true }).selectOption("PERCENTAGE");
+	await expect(dialog.getByLabel("Percentage (basis points)")).toHaveValue(
+		"250",
+	);
+	await expect(dialog.getByText(/Preview: 2.5%/)).toBeVisible();
+	await dialog.getByLabel("Percentage (basis points)").fill("-1");
+	await dialog.locator('button[type="submit"]').click();
+	await expect(
+		dialog
+			.getByRole("alert")
+			.filter({ hasText: "whole non-negative basis point" }),
+	).toBeVisible();
+	await expect(dialog.getByLabel("Percentage (basis points)")).toBeFocused();
+	await page.screenshot({
+		path: ".scratch/ui-polish/evidence/fee-validation.png",
+		fullPage: true,
+	});
+	await page.keyboard.press("Escape");
+	await page.goto("/events/event_id_exact");
+	await expect(
+		page.getByRole("link", { name: "Open public Url media" }),
+	).toHaveAttribute("href", "https://media.example.test/cover.png");
+	await page
+		.getByRole("button", { name: "Feature event", exact: true })
+		.click();
+	await expect(dialog).toContainText("Lagos live");
+	await expect(dialog).toContainText("event_id_exact");
+	await expect(
+		dialog.getByRole("heading", { name: "Feature event" }),
+	).toHaveCount(1);
+	await page.screenshot({
+		path: ".scratch/ui-polish/evidence/context-dialog.png",
+		fullPage: true,
+	});
+});
+
+test("polish: rendered contrast, targets, forced colors and slow motion evidence", async ({
+	page,
+}) => {
+	await mock(page);
+	await page.goto("/orders");
+	console.log(
+		"Polish rendered pairs",
+		await page
+			.locator(".records-panel th")
+			.first()
+			.evaluate((element) => ({
+				foreground: getComputedStyle(element).color,
+				background: getComputedStyle(element).backgroundColor,
+			})),
+	);
+	console.log(
+		"Polish boundary",
+		await page.getByLabel("Search records").evaluate((element) => ({
+			border: getComputedStyle(element).borderColor,
+			background: getComputedStyle(element).backgroundColor,
+		})),
+	);
+	await page.emulateMedia({ forcedColors: "active" });
+	await page.getByLabel("Search records").focus();
+	await expect(page.getByLabel("Search records")).toHaveCSS(
+		"border-style",
+		"solid",
+	);
+	await page.screenshot({
+		path: ".scratch/ui-polish/evidence/forced-colors.png",
+		fullPage: true,
+	});
+	await page.emulateMedia({
+		forcedColors: "none",
+		reducedMotion: "no-preference",
+	});
+	await page.goto("/events/event_id_exact");
+	await page.addStyleTag({
+		content: ".modal[open] { animation-play-state: paused; }",
+	});
+	await page
+		.getByRole("button", { name: "Feature event", exact: true })
+		.click();
+	const animationNames = await page.getByRole("dialog").evaluate((element) =>
+		element.getAnimations().map((animation) => {
+			animation.pause();
+			animation.playbackRate = 0.1;
+			animation.currentTime = 90;
+			return (animation as CSSAnimation).animationName;
+		}),
+	);
+	expect(animationNames).toContain("modal-enter");
+	await page.screenshot({
+		path: ".scratch/ui-polish/evidence/motion-midpoint.png",
+		fullPage: true,
+	});
+	await page.getByRole("dialog").evaluate(async (element) => {
+		const animations = element.getAnimations();
+		for (const animation of animations) {
+			animation.currentTime = 0;
+			animation.playbackRate = 0.1;
+			animation.play();
+		}
+		await Promise.all(animations.map((animation) => animation.finished));
+	});
+	await expect(page.getByRole("dialog")).toHaveCSS("translate", "none");
+});
+
+test("polish: delayed failure retains values, allows dismissal and retries once", async ({
+	page,
+}) => {
+	await mock(page);
+	let release = () => {};
+	const gate = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	let submissions = 0;
+	await page.route("**/admin/users/profile_exact/block", async (route) => {
+		submissions++;
+		expect(route.request().postDataJSON()).toEqual({
+			reason: "Review preserved",
+		});
+		if (submissions === 1) {
+			await gate;
+			return route.fulfill({
+				status: 500,
+				json: { message: "Try this review again" },
+			});
+		}
+		return route.fulfill({ json: { success: true } });
+	});
+	await page.goto("/users/profile_exact");
+	await page
+		.getByRole("button", { name: "Block profile", exact: true })
+		.click();
+	const dialog = page.getByRole("dialog");
+	await dialog.getByLabel("Reason", { exact: true }).fill("Review preserved");
+	await dialog.locator('button[type="submit"]').click();
+	try {
+		await expect.poll(() => submissions).toBe(1);
+		await page.keyboard.press("Escape");
+		await expect(dialog).toBeVisible();
+	} finally {
+		release();
+	}
+	await expect(dialog.getByRole("alert")).toHaveText("Try this review again");
+	await expect(dialog.getByLabel("Reason", { exact: true })).toHaveValue(
+		"Review preserved",
+	);
+	await expect(
+		dialog.getByRole("button", { name: "Close dialog" }),
+	).toBeEnabled();
+	await dialog.locator('button[type="submit"]').click();
+	await expect(dialog).not.toBeVisible();
+	expect(submissions).toBe(2);
+});
+
+test("polish: long records, wide table keyboard scrolling and zoomed desktop", async ({
+	page,
+}) => {
+	await mock(page);
+	const long = {
+		...records.orders,
+		reference: "LONG_REFERENCE_".repeat(12),
+		buyerName: "An organizer with a very long name ".repeat(6),
+		buyerEmail: `${"address".repeat(20)}@example.test`,
+		totalKobo: 98765432101,
+	};
+	await page.route("**/api/v1/admin/orders**", (route) =>
+		route.fulfill({ json: { items: [long], total: 1, page: 1, pageSize: 20 } }),
+	);
+	await page.setViewportSize({ width: 320, height: 900 });
+	await page.goto("/orders");
+	await page
+		.getByRole("link", { name: "View details" })
+		.scrollIntoViewIfNeeded();
+	await expect(
+		page.getByRole("link", { name: "View details" }),
+	).toBeInViewport();
+	expect(
+		await page.evaluate("document.documentElement.scrollWidth <= innerWidth"),
+	).toBe(true);
+	await page.screenshot({
+		path: ".scratch/ui-polish/evidence/long-mobile.png",
+		fullPage: true,
+	});
+	await page.unroute("**/api/v1/admin/orders**");
+	await page.goto("/orders/order_exact");
+	const scroll = page.getByRole("region", { name: "Payment attempts" });
+	await expect(page.getByText(/More columns/)).toBeVisible();
+	await scroll.focus();
+	await page.keyboard.press("ArrowRight");
+	await expect
+		.poll(() => scroll.evaluate((element) => element.scrollLeft))
+		.toBeGreaterThan(0);
+	await page.screenshot({
+		path: ".scratch/ui-polish/evidence/detail-mobile.png",
+		fullPage: true,
+	});
+	await page.setViewportSize({ width: 720, height: 450 });
+	const cdp = await page.context().newCDPSession(page);
+	// Equivalent layout viewport and pixel density to a 1440px desktop at 200% zoom.
+	await cdp.send("Emulation.setDeviceMetricsOverride", {
+		width: 720,
+		height: 450,
+		deviceScaleFactor: 2,
+		mobile: false,
+	});
+	await page.goto("/orders");
+	await expect(page.getByRole("link", { name: "View details" })).toBeVisible();
+	expect(
+		await page.evaluate("document.documentElement.scrollWidth <= innerWidth"),
+	).toBe(true);
+	await page.screenshot({
+		path: ".scratch/ui-polish/evidence/zoom-desktop.png",
+		fullPage: true,
+	});
+});
+
+test("polish: media allows HTTP links, rejects unsafe URLs and uses known image types", async ({
+	page,
+}) => {
+	await mock(page);
+	await page.route("**/api/v1/admin/events/event_id_exact", (route) =>
+		route.fulfill({
+			json: {
+				...records.events,
+				media: [
+					{ publicUrl: "javascript:alert(1)", altText: "Unsafe source" },
+					{
+						publicUrl: "http://media.example.test/video",
+						contentType: "video/mp4",
+						altText: "Event video",
+					},
+					{
+						publicUrl: "https://media.example.test/photo",
+						contentType: "image/jpeg",
+						altText: "Stage photo",
+					},
+				],
+			},
+		}),
+	);
+	await page.route("https://media.example.test/photo", (route) =>
+		route.fulfill({ status: 404, body: "" }),
+	);
+	await page.goto("/events/event_id_exact");
+	await expect(
+		page.getByText("javascript:alert(1)", { exact: true }),
+	).toBeVisible();
+	await expect(page.locator('a[href^="javascript:"]')).toHaveCount(0);
+	await expect(
+		page.getByRole("link", { name: "Open Event video" }),
+	).toHaveAttribute("href", "http://media.example.test/video");
+	await expect(
+		page.getByRole("link", { name: "Open Stage photo" }),
+	).toHaveAttribute("rel", "noopener noreferrer");
+	await expect(page.getByRole("img", { name: "Stage photo" })).toHaveCount(0);
 });

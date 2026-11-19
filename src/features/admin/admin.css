@@ -17,11 +17,11 @@
 	--card: #fff;
 	--border: #eae6ed;
 	--muted: var(--brand-wash);
-	--muted-foreground: #79717f;
+	--muted-foreground: #685e70;
 	--ring: var(--brand-violet);
 	--plum: var(--brand-plum-950);
 	--ink: var(--brand-plum-950);
-	--subtle: #847c89;
+	--subtle: #685e70;
 	--line: #eeeaf0;
 	--purple: var(--brand-violet);
 }
@@ -1509,8 +1509,23 @@ tbody tr:hover {
 	background: #291b3c70;
 	backdrop-filter: blur(3px);
 }
-.modal[open] {
-	animation: modal-enter 0.18s ease-out;
+@media (prefers-reduced-motion: no-preference) {
+	.modal[open] {
+		animation: modal-enter 0.18s ease-out;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.modal[open] {
+		animation: modal-fade 0.18s ease-out;
+	}
+}
+@keyframes modal-fade {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
 }
 .side-modal {
 	margin: 0 0 0 auto;
@@ -2794,5 +2809,58 @@ td,
 	}
 	.overview-welcome p span {
 		display: none;
+	}
+}
+
+/* Persistent boundaries also survive forced-colors rendering. */
+.form-field input,
+.form-field select,
+.form-field textarea,
+.records-panel input,
+.records-panel select,
+.carousel-upload textarea {
+	border-color: #87788f;
+}
+a.text-link,
+button.text-link {
+	min-height: 24px;
+	min-width: 24px;
+}
+.action-form {
+	display: grid;
+	gap: 20px;
+}
+.action-form .form-field {
+	margin: 0;
+}
+.action-context {
+	padding: 16px;
+	background: var(--brand-wash);
+	border-radius: 8px;
+	overflow-wrap: anywhere;
+}
+.action-context p {
+	margin: 8px 0 0;
+}
+.action-intro {
+	margin-block: 20px;
+	line-height: 1.6;
+}
+.field-help {
+	color: #685e70;
+	margin: 8px 0 0;
+	font-size: 12px;
+}
+.form-field .field-error,
+.form-error {
+	color: #85334b;
+}
+.form-field [aria-invalid="true"] {
+	border-color: #85334b;
+}
+@media (max-width: 650px) {
+	a.text-link,
+	button.text-link {
+		min-height: 44px;
 	}
 }

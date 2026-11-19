@@ -231,3 +231,93 @@ test("shows a list error and allows retrying", async ({ page }) => {
 	await page.getByRole("button", { name: "Retry loading images" }).click();
 	await expect(page.getByText("No carousel images yet.")).toBeVisible();
 });
+
+test("pending carousel removal prevents Escape and repeat dismissal", async ({
+	page,
+}) => {
+	await fixture(page);
+	await select(page);
+	await page.getByRole("button", { name: "Upload & publish" }).click();
+	await expect(page.locator(".carousel-library-list li")).toHaveCount(1);
+	let release = () => {};
+	const gate = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	let submissions = 0;
+	await page.route("**/api/v1/admin/carousel/images/image-1", async (route) => {
+		submissions++;
+		await gate;
+		await route.fulfill({ status: 503, json: { message: "Removal failed" } });
+	});
+	await page.getByRole("button", { name: "Remove", exact: true }).click();
+	const dialog = page.getByRole("dialog");
+	await dialog.getByRole("button", { name: "Confirm removal" }).click();
+	try {
+		await expect.poll(() => submissions).toBe(1);
+		await page.keyboard.press("Escape");
+		await dialog
+			.getByRole("button", { name: "Close dialog" })
+			.dispatchEvent("click");
+		await dialog.getByRole("button", { name: "Cancel" }).dispatchEvent("click");
+		await expect(dialog).toBeVisible();
+		await expect(
+			dialog.getByRole("button", { name: "Close dialog" }),
+		).toBeDisabled();
+	} finally {
+		release();
+	}
+	await expect(dialog.getByRole("alert")).toContainText("Removal failed");
+	await expect(
+		dialog.getByRole("button", { name: "Confirm removal" }),
+	).toBeEnabled();
+	await dialog.getByRole("button", { name: "Cancel" }).click();
+	await expect(dialog).not.toBeVisible();
+	expect(submissions).toBe(1);
+});
+
+test("polish: inspect opaque and transparent image surfaces", async ({
+	page,
+}) => {
+	await fixture(page);
+	const jpeg = Buffer.from(
+		await page.evaluate(() => {
+			const canvas = document.createElement("canvas");
+			canvas.width = 320;
+			canvas.height = 180;
+			const context = canvas.getContext("2d");
+			if (!context) throw new Error("Canvas unavailable");
+			context.fillStyle = "#fffdfb";
+			context.fillRect(0, 0, 320, 180);
+			return canvas.toDataURL("image/jpeg").split(",")[1];
+		}),
+		"base64",
+	);
+	await page.route("https://media.example.test/pale.jpg", (route) =>
+		route.fulfill({ contentType: "image/jpeg", body: jpeg }),
+	);
+	await page.route("**/api/v1/admin/carousel/images", (route) =>
+		route.fulfill({
+			json: {
+				items: [
+					{
+						...image,
+						id: "opaque",
+						publicUrl: "https://media.example.test/pale.jpg",
+						contentType: "image/jpeg",
+						altText: "Pale opaque photograph",
+					},
+					image,
+				],
+			},
+		}),
+	);
+	await page.reload();
+	await page
+		.getByLabel("Image", { exact: true })
+		.setInputFiles({ name: "pale.jpg", mimeType: "image/jpeg", buffer: jpeg });
+	await expect(page.getByAltText("Selected preview")).toBeVisible();
+	await page.screenshot({
+		path: ".scratch/ui-polish/evidence/carousel-surfaces.png",
+		fullPage: true,
+	});
+});

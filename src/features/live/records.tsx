@@ -13,6 +13,7 @@ import {
 	RecordsTable,
 } from "./records-components";
 export default function LiveRecords({ resource }: { resource: Resource }) {
+	const [pending, setPending] = useState(false);
 	const [addingRule, setAddingRule] = useState(false);
 	const [createdRuleId, setCreatedRuleId] = useState<string | null>(null);
 	const [search, setSearch] = useSearchParams();
@@ -107,13 +108,21 @@ export default function LiveRecords({ resource }: { resource: Resource }) {
 				)}
 			</section>
 			{resource === "fee-rules" && addingRule && (
-				<Modal open title="Add fee rule" onClose={() => setAddingRule(false)}>
+				<Modal
+					open
+					pending={pending}
+					title="Add fee rule"
+					onClose={() => {
+						if (!pending) setAddingRule(false);
+					}}
+				>
 					<p>
-						Applies to future orders from the effective time. Existing orders
-						keep their original fee.
+						Global scope. Applies to future orders from the effective time.
+						Existing orders keep their original fee.
 					</p>
 					<ActionForm
 						action={addFeeRuleAction}
+						onPendingChange={setPending}
 						close={() => setAddingRule(false)}
 						onSuccess={(data) => {
 							if (

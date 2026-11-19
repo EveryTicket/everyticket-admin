@@ -81,15 +81,21 @@ function RecordRow({
 	const view = presentRecord(resource, row);
 	return (
 		<tr>
-			<td>
+			<td data-label="Record">
 				<strong>{view.title}</strong>
 				<p>{view.subtitle}</p>
 			</td>
-			<td>
+			<td data-label="Status">
 				<Badge status={view.status} />
 			</td>
-			<td>{view.amount}</td>
-			<td>{view.date}</td>
+			<td data-label="Amount / detail">
+				<span className="mobile-field-label">Amount / detail</span>
+				{view.amount}
+			</td>
+			<td data-label="Date (WAT)">
+				<span className="mobile-field-label">Date (WAT)</span>
+				{view.date}
+			</td>
 			<td>
 				<Link className="text-link" to={href}>
 					View details
@@ -108,13 +114,13 @@ export function RecordsTable({
 	detailUrl: (id: string) => string;
 }) {
 	return (
-		<table>
+		<table className="collection-table">
 			<thead>
 				<tr>
-					<th>Record</th>
-					<th>Status</th>
-					<th>Amount / detail</th>
-					<th>Date (WAT)</th>
+					<th scope="col">Record</th>
+					<th scope="col">Status</th>
+					<th scope="col">Amount / detail</th>
+					<th scope="col">Date (WAT)</th>
 					<th />
 				</tr>
 			</thead>
